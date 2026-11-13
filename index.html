@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>Air-Taxi Routing Simulator</title>
+    <style>
+      :root {
+        --bg: #f4f4f2;
+        --panel: #ffffff;
+        --panel-2: #ececea;
+        --ink: #1c1e22;
+        --ink-2: #5a5e66;
+        --line: #d8d8d3;
+        --accent: #2f6f5e;
+        --accent-ink: #ffffff;
+        --warn: #b3402a;
+        --warn-bg: #fbeae6;
+        --amber: #9a6a12;
+        --sky: #e9edea;
+        --block: #dcdcd6;
+        --block-2: #d2d2ca;
+        --street: #f7f7f4;
+        --water: #cfdcd8;
+        --park: #d3ddcb;
+        --route: rgba(47, 111, 94, 0.35);
+        --shadow: 0 1px 3px rgba(20, 22, 26, 0.08);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141518;
+          --panel: #1d1f23;
+          --panel-2: #26282d;
+          --ink: #eceee9;
+          --ink-2: #a3a7ad;
+          --line: #34373d;
+          --accent: #4fae94;
+          --accent-ink: #0e1512;
+          --warn: #e0705a;
+          --warn-bg: #3a2320;
+          --amber: #d9a83f;
+          --sky: #1a1d20;
+          --block: #26282c;
+          --block-2: #2c2f33;
+          --street: #17181b;
+          --water: #22322e;
+          --park: #26301f;
+          --route: rgba(79, 174, 148, 0.4);
+          --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 16px 28px; }
+      header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 4px; }
+      header.top h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+      header.top .sub { color: var(--ink-2); font-size: 13.5px; }
+      .disclaimer {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 8px;
+        padding: 9px 12px;
+        font-size: 13px;
+        color: var(--ink-2);
+        margin: 10px 0 14px;
+      }
+      .disclaimer strong { color: var(--warn); font-weight: 650; }
+
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+      @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+      .sky-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .sky-head {
+        display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+        padding: 10px 14px; border-bottom: 1px solid var(--line);
+      }
+      .sky-head .city { font-weight: 650; font-size: 14px; }
+      .sky-head .clock { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; }
+      .sky-head .clock b { color: var(--ink); font-weight: 650; }
+      .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-left: auto; }
+      .legend span { display: inline-flex; align-items: center; gap: 5px; }
+      .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+      .sw-taxi { background: var(--accent); }
+      .sw-drone { background: var(--ink-2); }
+      .sw-conf { background: var(--warn); }
+      canvas#sky { display: block; width: 100%; height: auto; background: var(--sky); cursor: pointer; touch-action: manipulation; }
+
+      .panel { display: flex; flex-direction: column; gap: 14px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        padding: 14px;
+      }
+      .card h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 10px; }
+
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .stat { background: var(--panel-2); border-radius: 8px; padding: 10px 6px; text-align: center; }
+      .stat .num { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+      .stat .lbl { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+      .stat.warn .num { color: var(--warn); }
+
+      .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      button {
+        font: inherit; font-size: 14px; font-weight: 600;
+        border: 1px solid var(--line); border-radius: 8px;
+        background: var(--panel); color: var(--ink);
+        padding: 10px 8px; cursor: pointer;
+      }
+      button:hover { border-color: var(--ink-2); }
+      button:active { transform: translateY(1px); }
+      button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+      button.primary:hover { filter: brightness(1.08); }
+      button.wide { grid-column: 1 / -1; }
+      button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--ink-2); }
+      .slider-row { margin-top: 14px; }
+      .slider-row label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+      .slider-row label output { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+      input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+      .slider-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+
+      .route-card .ac-name { font-weight: 700; font-size: 15px; }
+      .route-card .ac-meta { color: var(--ink-2); font-size: 12.5px; margin-bottom: 8px; }
+      .route-card table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+      .route-card th { text-align: left; color: var(--ink-2); font-weight: 600; font-size: 11.5px; padding: 3px 4px; border-bottom: 1px solid var(--line); }
+      .route-card td { padding: 4px; border-bottom: 1px solid var(--line); }
+      .route-card tr:last-child td { border-bottom: none; }
+      .route-card tr.done td { color: var(--ink-2); }
+      .route-card .hint { color: var(--ink-2); font-size: 13px; margin: 0; }
+      .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--panel-2); color: var(--ink-2); vertical-align: 2px; margin-left: 6px; }
+      .pill.conflict { background: var(--warn-bg); color: var(--warn); }
+
+      .log-card { padding-bottom: 8px; }
+      .log {
+        list-style: none; margin: 0; padding: 0;
+        max-height: 300px; overflow-y: auto;
+        font-size: 13px;
+      }
+      .log li { padding: 6px 2px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
+      .log li:last-child { border-bottom: none; }
+      .log .t { color: var(--ink-2); font-variant-numeric: tabular-nums; flex: 0 0 auto; font-size: 12px; padding-top: 1px; }
+      .log li.detect .msg { color: var(--warn); font-weight: 600; }
+      .log li.resolve .msg { color: var(--accent); font-weight: 600; }
+      .log .empty { color: var(--ink-2); border-bottom: none; }
+      footer.note { color: var(--ink-2); font-size: 12.5px; margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>Air-Taxi Routing Simulator</h1>
+        <span class="sub">An AI routing engine assigns timed 4D routes — latitude, longitude, altitude, time — and resolves conflicts as they form.</span>
+      </header>
+
+      <p class="disclaimer">
+        <strong>Concept demo.</strong> This simulator uses simplified, fictional routing logic and simulated aircraft and demand only — no live air-traffic data. It is <strong>not certified aviation traffic-control software</strong> and must not be used for real flight operations.
+      </p>
+
+      <div class="layout">
+        <section class="sky-card" aria-label="City airspace view">
+          <div class="sky-head">
+            <span class="city">Meridian City Airspace</span>
+            <span class="clock">Sim time <b id="clock">T+00:00</b> · 1s = 10s</span>
+            <div class="legend" aria-hidden="true">
+              <span><i class="swatch sw-taxi"></i> Air taxi</span>
+              <span><i class="swatch sw-drone"></i> Drone</span>
+              <span><i class="swatch sw-conf"></i> Conflict</span>
+            </div>
+          </div>
+          <canvas id="sky" width="760" height="560" aria-label="Top-down map of the city with vertiports and aircraft on routes"></canvas>
+        </section>
+
+        <div class="panel">
+          <section class="card" aria-label="Simulation statistics">
+            <h2>Traffic picture</h2>
+            <div class="stats">
+              <div class="stat"><div class="num" id="statActive">0</div><div class="lbl">Active aircraft</div></div>
+              <div class="stat warn"><div class="num" id="statDetected">0</div><div class="lbl">Conflicts detected</div></div>
+              <div class="stat"><div class="num" id="statResolved">0</div><div class="lbl">Conflicts resolved</div></div>
+            </div>
+          </section>
+
+          <section class="card" aria-label="Simulation controls">
+            <h2>Controls</h2>
+            <div class="btn-row">
+              <button id="btnTaxi" class="primary" type="button">+ Add air taxi</button>
+              <button id="btnDrone" type="button">+ Add drone</button>
+              <button id="btnPause" type="button" aria-pressed="false">Pause</button>
+              <button id="btnReset" type="button">Reset</button>
+              <button id="btnBurst" class="wide" type="button">Rush hour — add 6 aircraft</button>
+            </div>
+            <div class="slider-row">
+              <label for="demand">Demand (auto-spawn rate) <output id="demandOut" for="demand">Medium</output></label>
+              <input type="range" id="demand" min="0" max="3" step="1" value="1" />
+              <div class="slider-scale"><span>Off</span><span>Low</span><span>Medium</span><span>High</span></div>
+            </div>
+          </section>
+
+          <section class="card route-card" aria-label="Selected aircraft route">
+            <h2>Selected 4D route</h2>
+            <div id="routeDetail"><p class="hint">Click any aircraft on the map to inspect its assigned route — waypoints, flight level, and the time it is planned to cross each point.</p></div>
+          </section>
+
+          <section class="card log-card" aria-label="Routing engine event log">
+            <h2>Routing engine log</h2>
+            <ul class="log" id="log" aria-live="polite"></ul>
+          </section>
+        </div>
+      </div>
+
+      <footer class="note">How it works: the engine projects every aircraft forward along its route. When two aircraft at the same flight level are projected to pass within the separation minimum, it flags a conflict and re-plans one of them — a flight-level change, a speed adjustment, or a lateral offset waypoint — then verifies the pair is clear.</footer>
+    </div>
+
+    <script>
+      "use strict";
+
+      /* ---------------- World ---------------- */
+      var W = 760, H = 560;
+      var VERTIPORTS = [
+        { id: "V1", name: "Central",    x: 380, y: 268 },
+        { id: "V2", name: "Northgate",  x: 150, y: 92  },
+        { id: "V3", name: "Harbor",     x: 96,  y: 452 },
+        { id: "V4", name: "Airport",    x: 636, y: 108 },
+        { id: "V5", name: "University", x: 620, y: 428 },
+        { id: "V6", name: "Stadium",    x: 372, y: 486 }
+      ];
+      var TAXI_LEVELS  = [70, 80, 90, 100, 110];
+      var DRONE_LEVELS = [40, 50, 60];
+      var SEP = 30;            // separation minimum, px (projected)
+      var LOOKAHEAD = [0, 2.5, 5, 7.5, 10]; // sim-seconds projected
+      var TIME_SCALE = 10;     // 1 real second = 10 sim seconds
+
+      var canvas = document.getElementById("sky");
+      var ctx = canvas.getContext("2d");
+
+      /* ---------------- State ---------------- */
+      var aircraft = [];
+      var nextId = { taxi: 1, drone: 1 };
+      var simTime = 0;         // sim seconds
+      var paused = false;
+      var stats = { detected: 0, resolved: 0 };
+      var selectedId = null;
+      var spawnTimer = 0;
+      var pairCooldown = {};   // "idA|idB" -> simTime until re-check allowed
+      var logEl = document.getElementById("log");
+
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+      function fmtClock(t) {
+        var m = Math.floor(t / 60), s = Math.floor(t % 60);
+        return "T+" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+      }
+      function fl(level) { return "FL" + String(level).padStart(3, "0"); }
+
+      function logEvent(kind, msg) {
+        var li = document.createElement("li");
+        if (kind) li.className = kind;
+        var t = document.createElement("span"); t.className = "t"; t.textContent = fmtClock(simTime);
+        var m = document.createElement("span"); m.className = "msg"; m.textContent = msg;
+        li.appendChild(t); li.appendChild(m);
+        var empty = logEl.querySelector(".empty");
+        if (empty) empty.remove();
+        logEl.prepend(li);
+        while (logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+      }
+
+      /* ---------------- Routes ---------------- */
+      // A route is a list of waypoints {x, y}. Aircraft carries distTravelled
+      // along the polyline; crossing times are computed from speed.
+      function buildRoute(from, to, offset) {
+        var pts = [{ x: from.x, y: from.y }];
+        if (offset) {
+          var mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
+          var dx = to.x - from.x, dy = to.y - from.y;
+          var len = Math.hypot(dx, dy) || 1;
+          pts.push({ x: mx + (-dy / len) * offset, y: my + (dx / len) * offset });
+        }
+        pts.push({ x: to.x, y: to.y });
+        return pts;
+      }
+      function routeLength(pts) {
+        var L = 0;
+        for (var i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        return L;
+      }
+      function posAt(pts, d) {
+        var acc = 0;
+        for (var i = 1; i < pts.length; i++) {
+          var seg = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+          if (d <= acc + seg || i === pts.length - 1) {
+            var f = seg === 0 ? 0 : Math.min(1, Math.max(0, (d - acc) / seg));
+            return {
+              x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * f,
+              y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * f,
+              hx: pts[i].x - pts[i - 1].x, hy: pts[i].y - pts[i - 1].y
+            };
+          }
+          acc += seg;
+        }
+        var last = pts[pts.length - 1];
+        return { x: last.x, y: last.y, hx: 0, hy: 0 };
+      }
+
+      /* ---------------- Aircraft ---------------- */
+      function spawn(type, quiet) {
+        var from = pick(VERTIPORTS), to = pick(VERTIPORTS);
+        var guard = 0;
+        while (to === from && guard++ < 10) to = pick(VERTIPORTS);
+        var isTaxi = type === "taxi";
+        var id = (isTaxi ? "TAXI-" : "DRN-") + (isTaxi ? nextId.taxi++ : nextId.drone++);
+        var baseSpeed = isTaxi ? rand(26, 34) : rand(15, 21); // px per sim-second
+        var level = pick(isTaxi ? TAXI_LEVELS : DRONE_LEVELS);
+        var pts = buildRoute(from, to, 0);
+        var ac = {
+          id: id, type: type, from: from, to: to,
+          pts: pts, totalLen: routeLength(pts),
+          dist: 0, baseSpeed: baseSpeed, speedFactor: 1,
+          level: level, dispLevel: level, // dispLevel eases toward level
+          conflict: false, conflictWith: null,
+          color: null
+        };
+        aircraft.push(ac);
+        if (!quiet) logEvent("", id + " departed " + from.name + " → " + to.name + " at " + fl(level) + ".");
+        return ac;
+      }
+
+      function projectedPos(ac, aheadSimSec) {
+        var d = ac.dist + ac.baseSpeed * ac.speedFactor * aheadSimSec;
+        if (d > ac.totalLen) d = ac.totalLen;
+        return posAt(ac.pts, d);
+      }
+
+      /* ---------------- Conflict engine ---------------- */
+      function pairKey(a, b) { return a.id < b.id ? a.id + "|" + b.id : b.id + "|" + a.id; }
+
+      function detectConflicts() {
+        // clear flags first
+        for (var i = 0; i < aircraft.length; i++) { aircraft[i].conflict = false; aircraft[i].conflictWith = null; }
+        for (var a = 0; a < aircraft.length; a++) {
+          for (var b = a + 1; b < aircraft.length; b++) {
+            var A = aircraft[a], B = aircraft[b];
+            if (A.level !== B.level) continue;
+            var key = pairKey(A, B);
+            if (pairCooldown[key] && simTime < pairCooldown[key]) continue;
+            var hit = false;
+            for (var k = 0; k < LOOKAHEAD.length; k++) {
+              var pa = projectedPos(A, LOOKAHEAD[k]);
+              var pb = projectedPos(B, LOOKAHEAD[k]);
+              if (Math.hypot(pa.x - pb.x, pa.y - pb.y) < SEP) { hit = true; break; }
+            }
+            if (hit) {
+              A.conflict = B.conflict = true;
+              A.conflictWith = B.id; B.conflictWith = A.id;
+              stats.detected++;
+              logEvent("detect", "Conflict detected: " + A.id + " and " + B.id + " projected inside separation minimum at " + fl(A.level) + ".");
+              resolve(A, B);
+              pairCooldown[key] = simTime + 14; // don't re-flag the same pair while the fix takes effect
+            }
+          }
+        }
+      }
+
+      function resolve(A, B) {
+        // The later-departed (shorter distance flown) aircraft maneuvers.
+        var mover = A.dist <= B.dist ? A : B;
+        var other = mover === A ? B : A;
+        var levels = mover.type === "taxi" ? TAXI_LEVELS : DRONE_LEVELS;
+
+        // Strategy 1: flight-level change to a level the other aircraft isn't using nearby.
+        var free = levels.filter(function (L) { return L !== mover.level && L !== other.level; });
+        if (free.length && Math.random() < 0.6) {
+          var nl = free.reduce(function (best, L) {
+            return Math.abs(L - mover.level) < Math.abs(best - mover.level) ? L : best;
+          }, free[0]);
+          var dir = nl > mover.level ? "climbed" : "descended";
+          mover.level = nl;
+          stats.resolved++;
+          logEvent("resolve", "Resolved: " + mover.id + " " + dir + " to " + fl(nl) + " to clear " + other.id + ".");
+          return;
+        }
+        // Strategy 2: lateral offset — rebuild remaining route with an offset waypoint.
+        if (Math.random() < 0.55) {
+          var pos = posAt(mover.pts, mover.dist);
+          var here = { x: pos.x, y: pos.y };
+          var rest = buildRoute(here, mover.to, (Math.random() < 0.5 ? -1 : 1) * rand(46, 70));
+          mover.pts = rest;
+          mover.totalLen = routeLength(rest);
+          mover.dist = 0;
+          stats.resolved++;
+          logEvent("resolve", "Resolved: " + mover.id + " re-routed on a lateral offset around " + other.id + ", holding " + fl(mover.level) + ".");
+          return;
+        }
+        // Strategy 3: speed adjustment.
+        mover.speedFactor = mover.speedFactor > 1 ? 0.62 : 1.45;
+        stats.resolved++;
+        logEvent("resolve", "Resolved: " + mover.id + (mover.speedFactor > 1 ? " sped up" : " slowed") + " to open a time gap with " + other.id + " at " + fl(mover.level) + ".");
+      }
+
+      /* ---------------- City drawing ---------------- */
+      var BLOCKS = [];
+      (function genCity() {
+        for (var gx = 28; gx < W - 60; gx += 84) {
+          for (var gy = 28; gy < H - 60; gy += 84) {
+            if (Math.random() < 0.16) continue;
+            BLOCKS.push({ x: gx + rand(0, 8), y: gy + rand(0, 8), w: rand(48, 62), h: rand(48, 62), alt: Math.random() < 0.5 });
+          }
+        }
+      })();
+
+      function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+      var palette = {};
+      function readPalette() {
+        palette = {
+          block: cssVar("--block"), block2: cssVar("--block-2"), street: cssVar("--street"),
+          water: cssVar("--water"), park: cssVar("--park"), accent: cssVar("--accent"),
+          ink2: cssVar("--ink-2"), ink: cssVar("--ink"), warn: cssVar("--warn"), route: cssVar("--route")
+        };
+      }
+      readPalette();
+      if (window.matchMedia) {
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        if (mq.addEventListener) mq.addEventListener("change", readPalette);
+      }
+
+      function drawCity() {
+        ctx.fillStyle = palette.street;
+        ctx.fillRect(0, 0, W, H);
+        // river along the west edge
+        ctx.fillStyle = palette.water;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(52, 0); ctx.lineTo(30, 200); ctx.lineTo(58, 380); ctx.lineTo(38, H); ctx.lineTo(0, H);
+        ctx.closePath(); ctx.fill();
+        // park
+        ctx.fillStyle = palette.park;
+        ctx.fillRect(452, 330, 118, 84);
+        // blocks
+        for (var i = 0; i < BLOCKS.length; i++) {
+          var b = BLOCKS[i];
+          ctx.fillStyle = b.alt ? palette.block2 : palette.block;
+          ctx.fillRect(b.x, b.y, b.w, b.h);
+        }
+        // vertiports
+        for (var v = 0; v < VERTIPORTS.length; v++) {
+          var p = VERTIPORTS[v];
+          ctx.strokeStyle = palette.ink2; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = palette.ink2;
+          ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
+          ctx.font = "600 11px 'Avenir Next','Segoe UI',sans-serif";
+          ctx.fillStyle = palette.ink;
+          ctx.textAlign = "center";
+          ctx.fillText(p.name, p.x, p.y - 17);
+          ctx.font = "10px 'Avenir Next','Segoe UI',sans-serif";
+          ctx.fillStyle = palette.ink2;
+          ctx.fillText(p.id, p.x, p.y + 24);
+        }
+      }
+
+      function drawAircraft(now) {
+        for (var i = 0; i < aircraft.length; i++) {
+          var ac = aircraft[i];
+          var p = posAt(ac.pts, ac.dist);
+          var heading = Math.atan2(p.hy, p.hx);
+
+          // planned route (faint) for the selected aircraft, remaining route for all
+          ctx.strokeStyle = ac.id === selectedId ? palette.accent : palette.route;
+          ctx.lineWidth = ac.id === selectedId ? 1.8 : 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          // draw remaining path
+          var acc = 0, started = false;
+          for (var s = 1; s < ac.pts.length; s++) {
+            var segLen = Math.hypot(ac.pts[s].x - ac.pts[s - 1].x, ac.pts[s].y - ac.pts[s - 1].y);
+            if (ac.dist < acc + segLen && !started) { started = true; }
+            if (started || ac.dist <= acc) ctx.lineTo(ac.pts[s].x, ac.pts[s].y);
+            acc += segLen;
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          var col = ac.conflict ? palette.warn : (ac.type === "taxi" ? palette.accent : palette.ink2);
+
+          // conflict pulse ring
+          if (ac.conflict) {
+            var r = 13 + 3.5 * Math.sin(now / 160);
+            ctx.strokeStyle = palette.warn; ctx.lineWidth = 1.6;
+            ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+          }
+          // selection ring
+          if (ac.id === selectedId) {
+            ctx.strokeStyle = palette.ink; ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 17, 0, Math.PI * 2); ctx.stroke();
+          }
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(heading);
+          ctx.fillStyle = col;
+          if (ac.type === "taxi") {
+            ctx.beginPath();
+            ctx.moveTo(9, 0); ctx.lineTo(-6, -5.5); ctx.lineTo(-3.5, 0); ctx.lineTo(-6, 5.5);
+            ctx.closePath(); ctx.fill();
+          } else {
+            ctx.fillRect(-5, -5, 10, 10);
+            ctx.fillStyle = palette.street;
+            ctx.fillRect(-2, -2, 4, 4);
+          }
+          ctx.restore();
+
+          // label: id + flight level (eased display level shows climbs/descents)
+          ctx.font = "600 10.5px 'Avenir Next','Segoe UI',sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillStyle = ac.conflict ? palette.warn : palette.ink;
+          var lvl = Math.round(ac.dispLevel);
+          ctx.fillText(ac.id + " · " + fl(lvl), p.x + 12, p.y - 6);
+        }
+        // conflict link lines
+        ctx.strokeStyle = palette.warn; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+        var drawn = {};
+        for (var j = 0; j < aircraft.length; j++) {
+          var a2 = aircraft[j];
+          if (!a2.conflict || !a2.conflictWith) continue;
+          var key = pairKey(a2, { id: a2.conflictWith });
+          if (drawn[key]) continue; drawn[key] = true;
+          var other = aircraft.find(function (x) { return x.id === a2.conflictWith; });
+          if (!other) continue;
+          var pa = posAt(a2.pts, a2.dist), pb = posAt(other.pts, other.dist);
+          ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      /* ---------------- Selected route panel ---------------- */
+      var routeDetail = document.getElementById("routeDetail");
+      function renderRoutePanel() {
+        var ac = aircraft.find(function (x) { return x.id === selectedId; });
+        if (!ac) {
+          routeDetail.innerHTML = '<p class="hint">Click any aircraft on the map to inspect its assigned route — waypoints, flight level, and the time it is planned to cross each point.</p>';
+          return;
+        }
+        var rows = "";
+        var cumDist = 0, prev = ac.pts[0];
+        var names = [];
+        names.push(ac.from.name);
+        for (var i = 1; i < ac.pts.length - 1; i++) names.push("Offset fix");
+        names.push(ac.to.name);
+        for (var k = 0; k < ac.pts.length; k++) {
+          if (k > 0) cumDist += Math.hypot(ac.pts[k].x - prev.x, ac.pts[k].y - prev.y);
+          prev = ac.pts[k];
+          var eta = simTime + Math.max(0, (cumDist - ac.dist)) / (ac.baseSpeed * ac.speedFactor);
+          var done = cumDist <= ac.dist + 0.5;
+          rows += "<tr" + (done ? ' class="done"' : "") + "><td>" + names[k] + "</td><td>" +
+                  Math.round(ac.pts[k].x) + ", " + Math.round(ac.pts[k].y) + "</td><td>" +
+                  fl(ac.level) + "</td><td>" + (done ? "crossed" : fmtClock(eta)) + "</td></tr>";
+        }
+        routeDetail.innerHTML =
+          '<div class="ac-name">' + ac.id + (ac.conflict ? '<span class="pill conflict">In conflict</span>' : '<span class="pill">On route</span>') + "</div>" +
+          '<div class="ac-meta">' + (ac.type === "taxi" ? "Air taxi" : "Delivery drone") + " · " + ac.from.name + " → " + ac.to.name +
+          " · speed ×" + ac.speedFactor.toFixed(2) + "</div>" +
+          "<table><thead><tr><th>Fix</th><th>Lat/Lon grid</th><th>Level</th><th>Crossing</th></tr></thead><tbody>" + rows + "</tbody></table>";
+      }
+
+      /* ---------------- UI wiring ---------------- */
+      var statActive = document.getElementById("statActive");
+      var statDetected = document.getElementById("statDetected");
+      var statResolved = document.getElementById("statResolved");
+      var clockEl = document.getElementById("clock");
+      var demandNames = ["Off", "Low", "Medium", "High"];
+      var demandRates = [0, 0.055, 0.13, 0.3]; // spawns per real second
+      var demandLevel = 1;
+
+      document.getElementById("btnTaxi").addEventListener("click", function () { spawn("taxi"); });
+      document.getElementById("btnDrone").addEventListener("click", function () { spawn("drone"); });
+      document.getElementById("btnBurst").addEventListener("click", function () {
+        for (var i = 0; i < 6; i++) spawn(Math.random() < 0.6 ? "taxi" : "drone", i > 0);
+        logEvent("", "Rush hour: 6 aircraft added to the flow.");
+      });
+      var btnPause = document.getElementById("btnPause");
+      btnPause.addEventListener("click", function () {
+        paused = !paused;
+        btnPause.textContent = paused ? "Resume" : "Pause";
+        btnPause.setAttribute("aria-pressed", paused ? "true" : "false");
+        logEvent("", paused ? "Simulation paused." : "Simulation resumed.");
+      });
+      document.getElementById("btnReset").addEventListener("click", function () { reset(); });
+      var demandEl = document.getElementById("demand");
+      var demandOut = document.getElementById("demandOut");
+      demandEl.addEventListener("input", function () {
+        demandLevel = parseInt(demandEl.value, 10);
+        demandOut.textContent = demandNames[demandLevel];
+      });
+
+      canvas.addEventListener("click", function (ev) {
+        var rect = canvas.getBoundingClientRect();
+        var x = (ev.clientX - rect.left) * (W / rect.width);
+        var y = (ev.clientY - rect.top) * (H / rect.height);
+        var best = null, bestD = 26;
+        for (var i = 0; i < aircraft.length; i++) {
+          var p = posAt(aircraft[i].pts, aircraft[i].dist);
+          var d = Math.hypot(p.x - x, p.y - y);
+          if (d < bestD) { bestD = d; best = aircraft[i]; }
+        }
+        selectedId = best ? best.id : null;
+        renderRoutePanel();
+      });
+
+      function reset() {
+        aircraft = [];
+        simTime = 0;
+        stats = { detected: 0, resolved: 0 };
+        pairCooldown = {};
+        selectedId = null;
+        spawnTimer = 0;
+        logEl.innerHTML = "";
+        for (var i = 0; i < 5; i++) spawn(i % 2 ? "drone" : "taxi", true);
+        logEvent("", "Simulation reset — routing engine re-planned the flow with 5 aircraft.");
+        renderRoutePanel();
+      }
+
+      /* ---------------- Main loop ---------------- */
+      var lastTs = null, detectTimer = 0, panelTimer = 0;
+      function frame(ts) {
+        if (lastTs === null) lastTs = ts;
+        var dtReal = Math.min(0.05, (ts - lastTs) / 1000);
+        lastTs = ts;
+        if (!paused) {
+          var dtSim = dtReal * TIME_SCALE;
+          simTime += dtSim;
+
+          // auto-spawn by demand
+          spawnTimer += dtReal * demandRates[demandLevel];
+          while (spawnTimer >= 1) {
+            spawnTimer -= 1;
+            if (aircraft.length < 26) spawn(Math.random() < 0.62 ? "taxi" : "drone");
+          }
+
+          // move aircraft
+          for (var i = aircraft.length - 1; i >= 0; i--) {
+            var ac = aircraft[i];
+            ac.dist += ac.baseSpeed * ac.speedFactor * dtSim;
+            // ease displayed flight level toward assigned level
+            ac.dispLevel += (ac.level - ac.dispLevel) * Math.min(1, dtReal * 2.2);
+            if (Math.abs(ac.level - ac.dispLevel) < 0.05) ac.dispLevel = ac.level;
+            if (ac.dist >= ac.totalLen) {
+              logEvent("", ac.id + " arrived at " + ac.to.name + " and left the flow.");
+              if (selectedId === ac.id) selectedId = null;
+              aircraft.splice(i, 1);
+            }
+          }
+
+          detectTimer += dtReal;
+          if (detectTimer > 0.35) { detectTimer = 0; detectConflicts(); updateStats(); }
+          panelTimer += dtReal;
+          if (panelTimer > 0.5) { panelTimer = 0; renderRoutePanel(); }
+          clockEl.textContent = fmtClock(simTime);
+        }
+        drawCity();
+        drawAircraft(ts);
+        requestAnimationFrame(frame);
+      }
+      function updateStats() {
+        statActive.textContent = aircraft.length;
+        statDetected.textContent = stats.detected;
+        statResolved.textContent = stats.resolved;
+      }
+
+      /* ---------------- Init ---------------- */
+      reset();
+      paused = false;
+      updateStats();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
